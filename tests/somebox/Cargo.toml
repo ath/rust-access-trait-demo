@@ -1,0 +1,9 @@
+[package]
+name = "somebox"
+version = "0.1.0"
+edition = "2024"
+description = "Stand-in for a third-party crate with pointer and lock types"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]

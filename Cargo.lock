@@ -4,4 +4,18 @@ version = 4
 
 [[package]]
 name = "access"
+version = "0.2.0"
+dependencies = [
+ "somebox",
+ "unsupported",
+]
+
+[[package]]
+name = "somebox"
 version = "0.1.0"
+
+[[package]]
+name = "unsupported"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61f4a4a7334e802e8c775bf395a355f2f2d6b7045053321d2bae1dea0c7ce49c"

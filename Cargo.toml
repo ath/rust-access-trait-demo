@@ -1,9 +1,14 @@
 [package]
 name = "access"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
-description = "Uniform `get_ref`/`get_mut` access through any nesting of pointers and locks"
+rust-version = "1.87"
+description = "Uniform, fallible access through any nesting of pointers and locks"
 license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
+unsupported = "0.2"
+
+[dev-dependencies]
+somebox = { path = "tests/somebox" }

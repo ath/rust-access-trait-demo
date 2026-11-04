@@ -7,14 +7,14 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
-use access::{Access, AccessMut, Lock, SharedMut};
+use access::{Access, AccessError, AccessMut, Lock, SharedMut};
 
 fn contents<P>(store: &impl Access<Vec<u32>, P>) -> Vec<u32> {
-    store.get_ref().clone()
+    store.must_get_ref().clone()
 }
 
 fn push<P>(store: &mut impl AccessMut<Vec<u32>, P>, value: u32) {
-    store.get_mut().push(value);
+    store.must_get_mut().push(value);
 }
 
 #[test]
@@ -57,6 +57,13 @@ fn rwlock() {
 #[test]
 fn rc_grants_shared_access() {
     let store = Rc::new(vec![1, 2]);
+    assert_eq!(contents(&store), [1, 2]);
+}
+
+#[test]
+fn unique_rc_grants_exclusive_access() {
+    let mut store = Rc::new(vec![1]);
+    push(&mut store, 2);
     assert_eq!(contents(&store), [1, 2]);
 }
 
@@ -107,11 +114,11 @@ impl Shape for Square {
 }
 
 fn area<P>(shape: &impl Access<dyn Shape, P>) -> f64 {
-    shape.get_ref().area()
+    shape.must_get_ref().area()
 }
 
 fn scale<P>(shape: &mut impl AccessMut<dyn Shape, P>, factor: f64) {
-    shape.get_mut().scale(factor);
+    shape.must_get_mut().scale(factor);
 }
 
 #[test]
@@ -125,7 +132,7 @@ fn unsized_values() {
 }
 
 fn increment<P>(counter: &impl SharedMut<u64, P>) {
-    *counter.lock_mut() += 1;
+    *counter.must_get_shared_mut() += 1;
 }
 
 #[test]
@@ -148,14 +155,14 @@ impl<S> Counter<S> {
     where
         S: AccessMut<u64, P>,
     {
-        *self.store.get_mut() += 1;
+        *self.store.must_get_mut() += 1;
     }
 
     fn value<P>(&self) -> u64
     where
         S: Access<u64, P>,
     {
-        *self.store.get_ref()
+        *self.store.must_get_ref()
     }
 }
 
@@ -176,7 +183,7 @@ fn generic_struct_over_the_storage() {
 }
 
 /// A lock defined outside the crate that counts how often it is acquired for
-/// writing.
+/// writing. It implements the required methods only.
 struct CountingCell<T> {
     value: RefCell<T>,
     writes: Cell<usize>,
@@ -194,25 +201,30 @@ impl<T> CountingCell<T> {
 impl<T> Lock for CountingCell<T> {
     type Inner = T;
 
-    fn read(&self) -> impl Deref<Target = T> {
-        self.value.borrow()
+    fn read(&self) -> Result<impl Deref<Target = T>, AccessError> {
+        Ok(self.value.try_borrow()?)
     }
 
-    fn write(&self) -> impl DerefMut<Target = T> {
+    fn write(&self) -> Result<impl DerefMut<Target = T>, AccessError> {
         self.writes.set(self.writes.get() + 1);
-        self.value.borrow_mut()
+        Ok(self.value.try_borrow_mut()?)
     }
 
-    fn inner_mut(&mut self) -> &mut T {
-        self.value.get_mut()
+    fn inner_mut(&mut self) -> Result<&mut T, AccessError> {
+        Ok(self.value.get_mut())
+    }
+
+    fn new(inner: T) -> Self {
+        Self::new(inner)
     }
 }
 
 #[test]
 fn custom_lock_composes_with_std_pointers() {
     let mut store = Rc::new(CountingCell::new(vec![1]));
+    let clone = Rc::clone(&store);
     push(&mut store, 2);
-    assert_eq!(contents(&store), [1, 2]);
+    assert_eq!(contents(&clone), [1, 2]);
     assert_eq!(store.writes.get(), 1);
 }
 
